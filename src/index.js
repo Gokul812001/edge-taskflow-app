@@ -29,24 +29,63 @@ export default {
     /* ================= AUTH ================= */
 
     // REGISTER
-    if (url.pathname === "/api/auth/register" && method === "POST") {
-      const { email, password } = await req.json();
-      const hashed = await hashPassword(password);
+   if (url.pathname === "/api/auth/register" && method === "POST") {
 
-      try {
-        await env.edge_taskflow_db
-          .prepare("INSERT INTO users (email, password) VALUES (?, ?)")
-          .bind(email, hashed)
-          .run();
-      } catch {
-        return Response.json(
-          { error: "User already exists. Please login." },
-          { status: 409, headers }
-        );
-      }
+  let body
 
-      return Response.json({ message: "Registered" }, { headers });
-    }
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json(
+      { error: "Invalid JSON body" },
+      { status: 400, headers }
+    )
+  }
+
+  const { email, password } = body
+
+  // ✅ REQUIRED FIELD VALIDATION
+  if (!email || !password) {
+    return Response.json(
+      { error: "Email and password are required" },
+      { status: 400, headers }
+    )
+  }
+
+  // ✅ EMAIL FORMAT CHECK
+  if (!email.includes("@")) {
+    return Response.json(
+      { error: "Invalid email format" },
+      { status: 400, headers }
+    )
+  }
+
+  // ✅ PASSWORD LENGTH CHECK
+  if (password.length < 6) {
+    return Response.json(
+      { error: "Password must be at least 6 characters" },
+      { status: 400, headers }
+    )
+  }
+
+  // ✅ ONLY NOW hash password
+  const hashed = await hashPassword(password)
+
+  try {
+    await env2.edge_taskflow_db
+      .prepare("INSERT INTO users (email, password) VALUES (?, ?)")
+      .bind(email, hashed)
+      .run()
+
+  } catch {
+    return Response.json(
+      { error: "User already exists. Please login." },
+      { status: 409, headers }
+    )
+  }
+
+  return Response.json({ message: "Registered" }, { headers })
+}
 
     // LOGIN
     if (url.pathname === "/api/auth/login" && method === "POST") {
